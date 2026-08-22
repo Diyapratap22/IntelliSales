@@ -1,0 +1,5 @@
+pandas
+openpyxl
+ydata-profiling
+setuptools<82
+pytest
