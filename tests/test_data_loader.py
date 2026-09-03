@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 
 from src.data_loader import load_sales_data
@@ -25,3 +26,19 @@ def test_load_sales_data_calculates_business_metrics():
 
     assert first_sale["revenue"] == 660000
     assert first_sale["profit"] == 180000
+
+def test_load_sales_data_accepts_uploaded_csv():
+    """An uploaded CSV-like file is loaded and analyzed correctly."""
+
+    uploaded_file = BytesIO(
+        b"date,product,region,quantity,unit_price,cost\n"
+        b"2026-01-01,Monitor,North,2,15000,20000\n"
+    )
+
+    uploaded_file.name = "uploaded_sales.csv"
+
+    dataframe = load_sales_data(uploaded_file)
+
+    assert len(dataframe) == 1
+    assert dataframe.iloc[0]["revenue"] == 30000
+    assert dataframe.iloc[0]["profit"] == 10000

@@ -38,12 +38,28 @@ st.title("📊 IntelliSales")
 st.caption("AI Data Analyst for Sales Intelligence & Forecasting")
 
 st.sidebar.header("Dashboard")
-st.sidebar.success("Sample sales data loaded")
-st.sidebar.caption(
-    "This first dashboard uses validated data and verified analytics."
+
+uploaded_file = st.sidebar.file_uploader(
+    "Upload sales data",
+    type=["csv", "xlsx", "xls"],
+    help="Upload a sales file that follows the IntelliSales data contract.",
 )
 
-dataframe = load_dashboard_data()
+if uploaded_file is not None:
+    try:
+        dataframe = load_sales_data(uploaded_file)
+        st.sidebar.success(f"Loaded: {uploaded_file.name}")
+    except ValueError as error:
+        st.error(f"Unable to analyze this file: {error}")
+        st.stop()
+else:
+    dataframe = load_dashboard_data()
+    st.sidebar.success("Sample sales data loaded")
+
+st.sidebar.caption(
+    "All metrics and insights are generated from validated data."
+)
+
 summary = calculate_sales_summary(dataframe)
 product_summary = summarize_performance_by(dataframe, "product")
 region_summary = summarize_performance_by(dataframe, "region")

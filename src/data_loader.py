@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import BinaryIO
 
 import pandas as pd
 
@@ -13,21 +14,28 @@ REQUIRED_COLUMNS = {
 }
 
 
-def load_sales_data(file_path: str | Path) -> pd.DataFrame:
+def load_sales_data(file_source: str | Path | BinaryIO) -> pd.DataFrame:
     """
     Load a CSV or Excel sales file, validate its core fields,
     and calculate reliable business metrics.
     """
 
-    path = Path(file_path)
+    if isinstance(file_source, (str, Path)):
+        path = Path(file_source)
 
-    if not path.exists():
-        raise FileNotFoundError(f"Sales file not found: {path}")
+        if not path.exists():
+            raise FileNotFoundError(f"Sales file not found: {path}")
 
-    if path.suffix.lower() == ".csv":
-        dataframe = pd.read_csv(path)
-    elif path.suffix.lower() in {".xlsx", ".xls"}:
-        dataframe = pd.read_excel(path)
+        file_name = path.name
+    else:
+        file_name = getattr(file_source, "name", "")
+
+    suffix = Path(file_name).suffix.lower()
+
+    if suffix == ".csv":
+        dataframe = pd.read_csv(file_source)
+    elif suffix in {".xlsx", ".xls"}:
+        dataframe = pd.read_excel(file_source)
     else:
         raise ValueError("Only CSV and Excel files are supported.")
 
