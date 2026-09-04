@@ -203,6 +203,7 @@ The AI Analyst uses a strict **tool-based architecture** and never invents busin
 2. The tool executes the real analytics functions in `src/` against the current dataset.
 3. The answer is formatted using only the verified numbers returned by the tool.
 4. If no tool matches the question, the analyst reports that it cannot answer rather than guessing.
+5. If a requested metric is unavailable in the uploaded dataset, the analyst explains the limitation and can provide relevant data-driven recommendations based on the verified metrics that are available.
 
 ---
 
