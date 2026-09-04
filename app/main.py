@@ -4,6 +4,7 @@ Serves the REST API and the static dashboard frontend.
 The legacy Streamlit dashboard is preserved in ``app/streamlit_dashboard.py``.
 """
 
+from io import BytesIO
 from pathlib import Path
 import sys
 
@@ -31,6 +32,21 @@ from src.utils import dataframe_to_records
 
 SAMPLE_FILE = PROJECT_ROOT / "data" / "raw" / "sample_sales.csv"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+class _NamedUploadFile(BytesIO):
+    """In-memory upload carrying the original filename for format detection.
+
+    FastAPI exposes the upload as a ``SpooledTemporaryFile`` whose ``name``
+    attribute is ``None`` while the content is held in memory. Wrapping the
+    content in a ``BytesIO`` that preserves ``UploadFile.filename`` lets
+    ``load_sales_data`` detect the file format from the real extension.
+    """
+
+    def __init__(self, content: bytes, filename: str) -> None:
+        super().__init__(content)
+        self.name = filename
+
 
 app = FastAPI(
     title="IntelliSales API",
@@ -105,8 +121,16 @@ def dataset_info() -> dict:
 async def upload_dataset(file: UploadFile = File(...)) -> dict:
     """Upload and validate a CSV or Excel sales file."""
 
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file must have a filename.",
+        )
+
+    upload = _NamedUploadFile(await file.read(), file.filename)
+
     try:
-        dataframe = load_sales_data(file.file)
+        dataframe = load_sales_data(upload)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
