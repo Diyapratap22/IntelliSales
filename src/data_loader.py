@@ -13,6 +13,8 @@ REQUIRED_COLUMNS = {
     "cost",
 }
 
+OPTIONAL_COLUMNS = {"category"}
+
 
 def load_sales_data(file_source: str | Path | BinaryIO) -> pd.DataFrame:
     """
@@ -67,6 +69,15 @@ def load_sales_data(file_source: str | Path | BinaryIO) -> pd.DataFrame:
         or dataframe["region"].astype("string").str.strip().eq("").any()
     ):
         raise ValueError("The 'product' and 'region' columns must not be blank.")
+
+    if "category" in dataframe.columns:
+        if (
+            dataframe["category"].isna().any()
+            or dataframe["category"].astype("string").str.strip().eq("").any()
+        ):
+            raise ValueError("The 'category' column must not be blank.")
+    else:
+        dataframe["category"] = dataframe["product"]
 
     if dataframe[numeric_columns].isna().any().any():
         raise ValueError(

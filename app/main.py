@@ -1,106 +1,205 @@
+"""IntelliSales — FastAPI application.
+
+Serves the REST API and the static dashboard frontend.
+The legacy Streamlit dashboard is preserved in ``app/streamlit_dashboard.py``.
+"""
+
 from pathlib import Path
 import sys
 
-import streamlit as st
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.analytics import calculate_sales_summary, summarize_performance_by
+from src.agent import answer_question
+from src.analytics import (
+    calculate_sales_summary,
+    generate_verified_insights,
+    get_revenue_trend,
+    summarize_performance_by,
+)
 from src.data_loader import load_sales_data
-
+from src.forecasting import get_forecast_series
+from src.utils import dataframe_to_records
 
 SAMPLE_FILE = PROJECT_ROOT / "data" / "raw" / "sample_sales.csv"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-
-@st.cache_data
-def load_dashboard_data():
-    """Load the included sample data once and reuse it efficiently."""
-
-    return load_sales_data(SAMPLE_FILE)
-
-
-def format_currency(value: float) -> str:
-    """Format a number as Indian currency for dashboard display."""
-
-    return f"₹{value:,.0f}"
-
-
-st.set_page_config(
-    page_title="IntelliSales",
-    page_icon="📊",
-    layout="wide",
+app = FastAPI(
+    title="IntelliSales API",
+    description="AI Data Analyst for Sales Intelligence & Forecasting",
+    version="1.0.0",
 )
 
-st.title("📊 IntelliSales")
-st.caption("AI Data Analyst for Sales Intelligence & Forecasting")
-
-st.sidebar.header("Dashboard")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload sales data",
-    type=["csv", "xlsx", "xls"],
-    help="Upload a sales file that follows the IntelliSales data contract.",
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-if uploaded_file is not None:
+# ---------------------------------------------------------------------------
+# In-memory dataset store
+# ---------------------------------------------------------------------------
+
+_dataset: pd.DataFrame | None = None
+
+
+def get_dataset() -> pd.DataFrame:
+    """Return the current dataset, loading the sample data if none is set."""
+
+    global _dataset
+
+    if _dataset is None:
+        _dataset = load_sales_data(SAMPLE_FILE)
+
+    return _dataset
+
+
+def set_dataset(dataframe: pd.DataFrame) -> None:
+    """Replace the in-memory dataset."""
+
+    global _dataset
+    _dataset = dataframe
+
+
+# ---------------------------------------------------------------------------
+# API endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/health")
+def health_check() -> dict:
+    """Health check endpoint."""
+
+    return {"status": "ok", "service": "IntelliSales"}
+
+
+@app.get("/api/dataset/info")
+def dataset_info() -> dict:
+    """Return metadata about the currently loaded dataset."""
+
+    dataframe = get_dataset()
+
+    return {
+        "rows": int(len(dataframe)),
+        "columns": list(dataframe.columns),
+        "date_min": dataframe["date"].min().isoformat(),
+        "date_max": dataframe["date"].max().isoformat(),
+        "products": sorted(dataframe["product"].unique().tolist()),
+        "regions": sorted(dataframe["region"].unique().tolist()),
+        "categories": sorted(dataframe["category"].unique().tolist()),
+        "source": "sample" if _dataset is None else "uploaded",
+    }
+
+
+@app.post("/api/dataset/upload")
+async def upload_dataset(file: UploadFile = File(...)) -> dict:
+    """Upload and validate a CSV or Excel sales file."""
+
     try:
-        dataframe = load_sales_data(uploaded_file)
-        st.sidebar.success(f"Loaded: {uploaded_file.name}")
+        dataframe = load_sales_data(file.file)
     except ValueError as error:
-        st.error(f"Unable to analyze this file: {error}")
-        st.stop()
-else:
-    dataframe = load_dashboard_data()
-    st.sidebar.success("Sample sales data loaded")
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
-st.sidebar.caption(
-    "All metrics and insights are generated from validated data."
-)
+    set_dataset(dataframe)
 
-summary = calculate_sales_summary(dataframe)
-product_summary = summarize_performance_by(dataframe, "product")
-region_summary = summarize_performance_by(dataframe, "region")
+    return {
+        "status": "ok",
+        "message": f"Loaded {file.filename}",
+        "rows": int(len(dataframe)),
+    }
 
-st.subheader("Business Overview")
 
-revenue_column, profit_column, quantity_column, margin_column = st.columns(4)
+@app.get("/api/summary")
+def sales_summary() -> dict:
+    """Headline KPI metrics for the dashboard cards."""
 
-revenue_column.metric("Total Revenue", format_currency(summary["total_revenue"]))
-profit_column.metric("Total Profit", format_currency(summary["total_profit"]))
-quantity_column.metric("Units Sold", f"{summary['total_quantity']:,}")
-margin_column.metric("Profit Margin", f"{summary['profit_margin']}%")
+    return calculate_sales_summary(get_dataset())
 
-st.divider()
 
-left_column, right_column = st.columns(2)
+@app.get("/api/trends/revenue")
+def revenue_trend() -> list[dict]:
+    """Monthly revenue trend for charting."""
 
-with left_column:
-    st.subheader("Revenue by Product")
-    st.bar_chart(product_summary.set_index("product")["total_revenue"])
+    trend = get_revenue_trend(get_dataset())
+    return dataframe_to_records(trend)
 
-with right_column:
-    st.subheader("Revenue by Region")
-    st.bar_chart(region_summary.set_index("region")["total_revenue"])
 
-top_product = product_summary.iloc[0]
-top_region = region_summary.iloc[0]
+@app.get("/api/performance/product")
+def product_performance() -> list[dict]:
+    """Product performance summary."""
 
-st.subheader("Verified Insights")
-st.write(
-    f"• **{top_product['product']}** is the highest-revenue product, "
-    f"generating {format_currency(top_product['total_revenue'])}."
-)
-st.write(
-    f"• **{top_region['region']}** is the highest-revenue region, "
-    f"generating {format_currency(top_region['total_revenue'])}."
-)
+    summary = summarize_performance_by(get_dataset(), "product")
+    return dataframe_to_records(summary)
 
-st.subheader("Performance Details")
-st.dataframe(
-    region_summary,
-    hide_index=True,
-    use_container_width=True,
-)
+
+@app.get("/api/performance/region")
+def region_performance() -> list[dict]:
+    """Regional performance summary."""
+
+    summary = summarize_performance_by(get_dataset(), "region")
+    return dataframe_to_records(summary)
+
+
+@app.get("/api/performance/category")
+def category_performance() -> list[dict]:
+    """Category performance summary."""
+
+    summary = summarize_performance_by(get_dataset(), "category")
+    return dataframe_to_records(summary)
+
+
+@app.get("/api/forecast")
+def forecast(periods: int = 6) -> dict:
+    """Combined historical + forecast series with confidence bands."""
+
+    if periods <= 0:
+        raise HTTPException(status_code=400, detail="Periods must be greater than zero.")
+
+    try:
+        return get_forecast_series(get_dataset(), periods=periods)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/insights")
+def insights() -> list[dict]:
+    """Verified rule-based insights derived from the dataset."""
+
+    return generate_verified_insights(get_dataset())
+
+
+@app.post("/api/analyst/ask")
+def analyst_ask(payload: dict) -> dict:
+    """Answer a natural-language question using verified analytics tools."""
+
+    question = (payload.get("question") or "").strip()
+
+    if not question:
+        raise HTTPException(status_code=400, detail="Question must not be empty.")
+
+    return answer_question(question, get_dataset())
+
+
+# ---------------------------------------------------------------------------
+# Static frontend
+# ---------------------------------------------------------------------------
+
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/")
+def index() -> FileResponse:
+    """Serve the dashboard frontend."""
+
+    return FileResponse(STATIC_DIR / "index.html")

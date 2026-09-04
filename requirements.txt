@@ -4,3 +4,7 @@ ydata-profiling
 setuptools<82
 pytest
 streamlit
+numpy
+fastapi
+uvicorn
+python-multipart

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IntelliSales — AI Data Analyst for Sales Intelligence & Forecasting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-shell">
+        <!-- ===== Sidebar ===== -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18" />
+                        <path d="M7 14l4-4 3 3 5-6" />
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-name">IntelliSales</span>
+                    <span class="brand-tagline">AI Data Analyst</span>
+                </div>
+            </div>
+
+            <nav class="nav">
+                <button class="nav-item active" data-page="overview">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    <span>Overview</span>
+                </button>
+                <button class="nav-item" data-page="analytics">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+                    <span>Analytics</span>
+                </button>
+                <button class="nav-item" data-page="forecasting">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+                    <span>Forecasting</span>
+                </button>
+                <button class="nav-item" data-page="analyst">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg>
+                    <span>AI Analyst</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="upload-zone">
+                    <label class="upload-btn" for="file-upload">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>
+                        Upload Sales Data
+                    </label>
+                    <input type="file" id="file-upload" accept=".csv,.xlsx,.xls" hidden />
+                    <span class="upload-hint">CSV or Excel</span>
+                </div>
+                <div class="dataset-badge" id="dataset-badge">
+                    <span class="dot"></span>
+                    <span id="dataset-label">Loading…</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ===== Main Content ===== -->
+        <main class="main">
+            <!-- ===== Top Bar ===== -->
+            <header class="topbar">
+                <div class="page-title">
+                    <h1 id="page-heading">Overview</h1>
+                    <p id="page-subheading">Sales intelligence at a glance</p>
+                </div>
+                <div class="analyst-search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                    <input type="text" id="global-search" placeholder="Ask the AI Analyst…" />
+                </div>
+            </header>
+
+            <!-- ===== Overview Page ===== -->
+            <section class="page active" id="page-overview">
+                <!-- KPI Cards -->
+                <div class="kpi-grid" id="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+                        </div>
+                        <div class="kpi-body">
+                            <div class="kpi-label">Total Revenue</div>
+                            <div class="kpi-value" id="kpi-revenue">—</div>
+                            <div class="kpi-sub" id="kpi-revenue-sub">—</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+                        </div>
+                        <div class="kpi-body">
+                            <div class="kpi-label">Total Profit</div>
+                            <div class="kpi-value" id="kpi-profit">—</div>
+                            <div class="kpi-sub" id="kpi-profit-sub">—</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16"/><path d="M8 8h8v8"/></svg>
+                        </div>
+                        <div class="kpi-body">
+                            <div class="kpi-label">Units Sold</div>
+                            <div class="kpi-value" id="kpi-quantity">—</div>
+                            <div class="kpi-sub" id="kpi-quantity-sub">—</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/></svg>
+                        </div>
+                        <div class="kpi-body">
+                            <div class="kpi-label">Profit Margin</div>
+                            <div class="kpi-value" id="kpi-margin">—</div>
+                            <div class="kpi-sub" id="kpi-margin-sub">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Revenue Trend + Forecast -->
+                <div class="chart-row">
+                    <div class="panel chart-panel">
+                        <div class="panel-header">
+                            <h3>Revenue Trend</h3>
+                            <span class="panel-badge">Monthly</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="revenue-trend-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="panel chart-panel">
+                        <div class="panel-header">
+                            <h3>Historical vs Forecast</h3>
+                            <span class="panel-badge">6 months</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="forecast-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Insights + Product Performance -->
+                <div class="insights-row">
+                    <div class="panel insights-panel">
+                        <div class="panel-header">
+                            <h3>AI Insights & Drivers</h3>
+                            <span class="verified-badge">✓ Verified from data</span>
+                        </div>
+                        <div class="insights-list" id="insights-list">
+                            <div class="insight-loading">Loading insights…</div>
+                        </div>
+                    </div>
+                    <div class="panel performance-panel">
+                        <div class="panel-header">
+                            <h3>Product Performance</h3>
+                            <span class="panel-badge">Ranked by revenue</span>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table compact" id="product-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Product</th>
+                                        <th>Revenue</th>
+                                        <th>Profit</th>
+                                        <th>Units</th>
+                                        <th>Margin</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="product-table-body">
+                                    <tr><td colspan="6" class="table-loading">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Region + Category -->
+                <div class="chart-row">
+                    <div class="panel chart-panel">
+                        <div class="panel-header">
+                            <h3>Regional Performance</h3>
+                            <span class="panel-badge">Revenue · Profit · Units</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="region-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="panel chart-panel">
+                        <div class="panel-header">
+                            <h3>Category Performance</h3>
+                            <span class="panel-badge">Revenue share</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="category-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== Analytics Page ===== -->
+            <section class="page" id="page-analytics">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Detailed Analytics</h3>
+                        <span class="panel-badge">Full breakdown</span>
+                    </div>
+                    <div class="analytics-tabs">
+                        <button class="tab-btn active" data-tab="product">Product</button>
+                        <button class="tab-btn" data-tab="region">Region</button>
+                        <button class="tab-btn" data-tab="category">Category</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Name</th>
+                                    <th>Revenue</th>
+                                    <th>Profit</th>
+                                    <th>Units</th>
+                                    <th>Records</th>
+                                    <th>Margin</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analytics-table-body">
+                                <tr><td colspan="7" class="table-loading">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Monthly Revenue Trend</h3>
+                    </div>
+                    <div class="chart-container tall">
+                        <canvas id="analytics-trend-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== Forecasting Page ===== -->
+            <section class="page" id="page-forecasting">
+                <div class="forecast-controls">
+                    <div class="panel-header">
+                        <h3>Revenue Forecast</h3>
+                    </div>
+                    <div class="period-selector">
+                        <button class="period-btn active" data-periods="3">3 months</button>
+                        <button class="period-btn" data-periods="6">6 months</button>
+                        <button class="period-btn" data-periods="12">12 months</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid forecast-kpis">
+                    <div class="kpi-card">
+                        <div class="kpi-label">Projected Next Month</div>
+                        <div class="kpi-value" id="forecast-next">—</div>
+                        <div class="kpi-sub" id="forecast-next-range">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Projected Total</div>
+                        <div class="kpi-value" id="forecast-total">—</div>
+                        <div class="kpi-sub" id="forecast-total-period">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Expected Growth</div>
+                        <div class="kpi-value" id="forecast-growth">—</div>
+                        <div class="kpi-sub">vs. last month</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Historical vs Forecast</h3>
+                        <span class="panel-badge">Solid = actual · Dashed = predicted</span>
+                    </div>
+                    <div class="chart-container tall">
+                        <canvas id="forecast-page-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Forecast Details</h3>
+                        <span class="panel-badge">95% confidence interval</span>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="forecast-table">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Forecast Revenue</th>
+                                    <th>Lower Bound</th>
+                                    <th>Upper Bound</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forecast-table-body">
+                                <tr><td colspan="4" class="table-loading">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== AI Analyst Page ===== -->
+            <section class="page" id="page-analyst">
+                <div class="panel chat-panel">
+                    <div class="panel-header">
+                        <h3>AI Analyst</h3>
+                        <span class="verified-badge">✓ Verified answers only</span>
+                    </div>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message assistant">
+                            <div class="message-avatar">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg>
+                            </div>
+                            <div class="message-content">
+                                <p>Hello! I'm your IntelliSales AI Analyst. I answer questions using verified calculations from your data — I never invent numbers.</p>
+                                <p class="suggest-label">Try asking:</p>
+                                <div class="suggestions">
+                                    <button class="suggestion-chip" data-question="What was our total revenue?">What was our total revenue?</button>
+                                    <button class="suggestion-chip" data-question="Which product performed best?">Which product performed best?</button>
+                                    <button class="suggestion-chip" data-question="Which region generated the most profit?">Which region generated the most profit?</button>
+                                    <button class="suggestion-chip" data-question="What is the revenue forecast?">What is the revenue forecast?</button>
+                                    <button class="suggestion-chip" data-question="Why did revenue change?">Why did revenue change?</button>
+                                    <button class="suggestion-chip" data-question="What should I focus on?">What should I focus on?</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-row">
+                        <input type="text" id="chat-input" placeholder="Ask about revenue, products, regions, forecasts…" />
+                        <button class="send-btn" id="chat-send">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
