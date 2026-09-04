@@ -1,8 +1,19 @@
 from fastapi.testclient import TestClient
+import pytest
 
+import app.main as main_module
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture
+def restore_dataset():
+    """Restore the in-memory dataset after the test completes."""
+
+    original = main_module._dataset
+    yield
+    main_module._dataset = original
 
 
 def test_health_check():
@@ -109,3 +120,63 @@ def test_analyst_rejects_empty_question():
     response = client.post("/api/analyst/ask", json={"question": ""})
 
     assert response.status_code == 400
+
+
+UPLOAD_CSV_CONTENT = (
+    b"date,product,region,quantity,unit_price,cost\n"
+    b"2026-01-01,Monitor,North,2,15000,20000\n"
+    b"2026-02-01,Keyboard,South,5,2000,6000\n"
+)
+
+
+def test_upload_csv_sets_uploaded_dataset(restore_dataset):
+    """Uploading a CSV replaces the in-memory dataset for all endpoints."""
+
+    response = client.post(
+        "/api/dataset/upload",
+        files={"file": ("uploaded_sales.csv", UPLOAD_CSV_CONTENT, "text/csv")},
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["status"] == "ok"
+    assert payload["message"] == "Loaded uploaded_sales.csv"
+    assert payload["rows"] == 2
+
+    info = client.get("/api/dataset/info")
+
+    assert info.status_code == 200
+
+    info_payload = info.json()
+
+    assert info_payload["source"] == "uploaded"
+    assert info_payload["rows"] == 2
+    assert info_payload["date_min"] == "2026-01-01T00:00:00"
+    assert info_payload["date_max"] == "2026-02-01T00:00:00"
+    assert info_payload["products"] == ["Keyboard", "Monitor"]
+    assert info_payload["regions"] == ["North", "South"]
+
+    summary = client.get("/api/summary")
+
+    assert summary.status_code == 200
+
+    summary_payload = summary.json()
+
+    assert summary_payload["total_revenue"] == 40000.0
+    assert summary_payload["total_profit"] == 14000.0
+    assert summary_payload["total_quantity"] == 7
+    assert summary_payload["total_transactions"] == 2
+
+
+def test_upload_rejects_unsupported_file_type(restore_dataset):
+    """Unsupported uploads return a useful 400 response, not a 500."""
+
+    response = client.post(
+        "/api/dataset/upload",
+        files={"file": ("sales.txt", b"date,product,region\n", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert "Only CSV and Excel files are supported." in response.json()["detail"]

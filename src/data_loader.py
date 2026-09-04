@@ -30,7 +30,7 @@ def load_sales_data(file_source: str | Path | BinaryIO) -> pd.DataFrame:
 
         file_name = path.name
     else:
-        file_name = getattr(file_source, "name", "")
+        file_name = getattr(file_source, "name", "") or ""
 
     suffix = Path(file_name).suffix.lower()
 

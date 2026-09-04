@@ -366,6 +366,45 @@ def _classify_intent(question: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Unavailable metric fallback
+# ---------------------------------------------------------------------------
+
+# Metrics that are commonly asked about but are NOT part of the sales dataset.
+# Each entry maps matching keywords to the (metric label, subject phrase) used
+# in the acknowledgement reply.
+_UNAVAILABLE_METRICS: tuple[tuple[tuple[str, ...], str, str], ...] = (
+    (("satisfaction", "csat", "nps"), "Customer satisfaction", "satisfaction score"),
+    (("churn", "retention"), "Customer churn/retention", "churn or retention rate"),
+    (
+        ("product rating", "customer rating", "product review", "customer review"),
+        "Product ratings",
+        "product ratings",
+    ),
+    (("sentiment", "customer feedback"), "Customer feedback", "feedback scores"),
+    (
+        ("engagement", "loyalty"),
+        "Customer engagement",
+        "engagement or loyalty metric",
+    ),
+    (("conversion",), "Conversion", "conversion rate"),
+    (("market share", "competitor"), "Market share", "market share"),
+)
+
+
+def _find_unavailable_metric(question: str) -> tuple[str, str] | None:
+    """Return (label, subject) when the question asks about a metric that is
+    not part of the sales dataset, otherwise None."""
+
+    normalized = question.lower()
+
+    for keywords, label, subject in _UNAVAILABLE_METRICS:
+        if any(keyword in normalized for keyword in keywords):
+            return label, subject
+
+    return None
+
+
 def answer_question(question: str, dataframe: pd.DataFrame) -> dict[str, Any]:
     """
     Answer a natural-language question using verified analytics tools.
@@ -375,6 +414,27 @@ def answer_question(question: str, dataframe: pd.DataFrame) -> dict[str, Any]:
     """
 
     tool_name = _classify_intent(question)
+
+    unavailable = None
+
+    if tool_name is None or tool_name == "recommendations":
+        unavailable = _find_unavailable_metric(question)
+
+    if unavailable is not None:
+        metric_label, metric_subject = unavailable
+        recommendations = _tool_recommendations(dataframe, question)
+
+        return {
+            "question": question,
+            "tool": recommendations["tool"],
+            "answer": (
+                f"{metric_label} data is not available in the uploaded dataset, "
+                f"so I can't provide a verified {metric_subject}. However, "
+                f"based on the available sales data, here are some "
+                f"data-driven recommendations:"
+            ),
+            "data": recommendations["data"],
+        }
 
     if tool_name is None:
         supported = ", ".join(
