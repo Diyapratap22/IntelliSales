@@ -71,25 +71,24 @@ def load_sales_data(file_source: str | Path | BinaryIO) -> pd.DataFrame:
         raise ValueError("The 'product' and 'region' columns must not be blank.")
 
     if "category" in dataframe.columns:
-        if (
-            dataframe["category"].isna().any()
-            or dataframe["category"].astype("string").str.strip().eq("").any()
-        ):
-            raise ValueError("The 'category' column must not be blank.")
+        # Allow null/blank category values so they are surfaced in null counts.
+        dataframe["category"] = dataframe["category"].astype("string").str.strip()
+        dataframe["category"] = dataframe["category"].replace("", pd.NA)
     else:
         dataframe["category"] = dataframe["product"]
 
-    if dataframe[numeric_columns].isna().any().any():
-        raise ValueError(
-            "The 'quantity', 'unit_price', and 'cost' columns must contain valid numbers."
-        )
+    # Allow null values in numeric columns; they are reported in null counts
+    # and excluded from aggregations. Only reject non-numeric garbage is
+    # already coerced to NaN above, which is now permitted.
+    pass
 
-    if (dataframe["quantity"] <= 0).any():
+    non_null_qty = dataframe["quantity"].dropna()
+    if (non_null_qty <= 0).any():
         raise ValueError(
             "The 'quantity' column must contain values greater than zero."
         )
 
-    if (dataframe["quantity"] % 1 != 0).any():
+    if (non_null_qty % 1 != 0).any():
         raise ValueError("The 'quantity' column must contain whole numbers.")
 
     if (dataframe[["unit_price", "cost"]] < 0).any().any():
