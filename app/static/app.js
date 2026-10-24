@@ -42,6 +42,8 @@ let state = {
     forecast: { historical: [], forecast: [] },
     forecastPeriods: 6,
     analyticsTab: "product",
+    anomalies: { transactions: [], time_series: [], dimensions: { product: [], region: [], category: [] }, summary: {} },
+    bigData: null,
 };
 
 /* ---------- Helpers ---------- */
@@ -86,6 +88,8 @@ const PAGE_META = {
     analytics: { title: "Analytics", subtitle: "Detailed performance breakdown" },
     forecasting: { title: "Forecasting", subtitle: "Projected revenue from your data" },
     analyst: { title: "AI Analyst", subtitle: "Ask questions — get verified answers" },
+    anomalies: { title: "Anomaly Detection", subtitle: "Statistical outlier analysis" },
+    bigdata: { title: "Big Data Analysis", subtitle: "Dataset health & processing strategy" },
 };
 
 function switchPage(page) {
@@ -111,6 +115,12 @@ function switchPage(page) {
         }
         if (page === "forecasting") {
             renderForecastPage();
+        }
+        if (page === "anomalies") {
+            loadAnomalies();
+        }
+        if (page === "bigdata") {
+            renderBigDataPage();
         }
     }, 50);
 }
@@ -748,15 +758,18 @@ async function askAnalyst(question) {
 
 async function loadAllData() {
     try {
-        const [summary, product, region, category, insights, trend, forecast] = await Promise.all([
-            fetchJson("/api/summary"),
-            fetchJson("/api/performance/product"),
-            fetchJson("/api/performance/region"),
-            fetchJson("/api/performance/category"),
-            fetchJson("/api/insights"),
-            fetchJson("/api/trends/revenue"),
-            fetchJson(`/api/forecast?periods=${state.forecastPeriods}`),
-        ]);
+        const [summary, product, region, category, insights, trend, forecast, anomalySummary, bigData] =
+            await Promise.all([
+                fetchJson("/api/summary"),
+                fetchJson("/api/performance/product"),
+                fetchJson("/api/performance/region"),
+                fetchJson("/api/performance/category"),
+                fetchJson("/api/insights"),
+                fetchJson("/api/trends/revenue"),
+                fetchJson(`/api/forecast?periods=${state.forecastPeriods}`),
+                fetchJson("/api/anomalies/summary"),
+                fetchJson("/api/big-data/analyze"),
+            ]);
 
         state.summary = summary;
         state.productPerformance = product;
@@ -765,6 +778,8 @@ async function loadAllData() {
         state.insights = insights;
         state.trend = trend;
         state.forecast = forecast;
+        state.anomalies.summary = anomalySummary;
+        state.bigData = bigData;
 
         renderKpis(summary);
         renderProductTable(product);
@@ -772,6 +787,8 @@ async function loadAllData() {
         renderOverViewCharts();
         renderAnalyticsTable(product, "product");
         renderAnalyticsTrendChart();
+        renderAnomalyKPIs();
+        renderBigDataKPIs();
     } catch (error) {
         console.error("Failed to load data:", error);
         document.getElementById("insights-list").innerHTML =
@@ -788,6 +805,323 @@ async function loadForecastWithPeriods() {
     } catch (error) {
         console.error("Failed to load forecast:", error);
     }
+}
+
+/* ---------- Anomaly Detection ---------- */
+
+function renderAnomalyKPIs() {
+    const summary = state.anomalies.summary;
+    if (!summary || Object.keys(summary).length === 0) return;
+
+    document.getElementById("anomaly-total").textContent = summary.total_anomalies ?? 0;
+    document.getElementById("anomaly-total-sub").textContent = "detected";
+    document.getElementById("anomaly-high").textContent = summary.high_severity ?? 0;
+    document.getElementById("anomaly-high-sub").textContent = "needs attention";
+    document.getElementById("anomaly-txn").textContent = summary.transaction_anomalies ?? 0;
+    document.getElementById("anomaly-txn-sub").textContent = "unusual sales";
+    document.getElementById("anomaly-ts").textContent = summary.time_series_anomalies ?? 0;
+    document.getElementById("anomaly-ts-sub").textContent = "revenue spikes/drops";
+}
+
+async function loadAnomalies() {
+    try {
+        const anomalies = await fetchJson("/api/anomalies");
+        state.anomalies = anomalies;
+        renderAnomalyKPIs();
+        renderAnomaliesPage();
+    } catch (error) {
+        console.error("Failed to load anomalies:", error);
+    }
+}
+
+function renderAnomaliesPage() {
+    const anomalies = state.anomalies;
+    if (!anomalies) return;
+
+    const all = [];
+
+    for (const tx of anomalies.transactions || []) {
+        all.push({
+            ...tx,
+            display_type: "Transaction",
+            display_label: tx.context ? `${tx.context.product} · ${tx.context.region}` : "—",
+        });
+    }
+
+    for (const ts of anomalies.time_series || []) {
+        all.push({
+            ...ts,
+            display_type: "Time-Series",
+            display_label: ts.context ? ts.context.month : "—",
+        });
+    }
+
+    for (const dim of (anomalies.dimensions && anomalies.dimensions.product) || []) {
+        all.push({ ...dim, display_type: "Dimension (Product)", display_label: dim.context ? dim.context.product : "—" });
+    }
+    for (const dim of (anomalies.dimensions && anomalies.dimensions.region) || []) {
+        all.push({ ...dim, display_type: "Dimension (Region)", display_label: dim.context ? dim.context.region : "—" });
+    }
+    for (const dim of (anomalies.dimensions && anomalies.dimensions.category) || []) {
+        all.push({ ...dim, display_type: "Dimension (Category)", display_label: dim.context ? dim.context.category : "—" });
+    }
+
+    all.sort((a, b) => {
+        const order = { high: 0, medium: 1, low: 2, info: 3 };
+        return (order[a.severity] || 99) - (order[b.severity] || 99);
+    });
+
+    const tbody = document.getElementById("anomaly-table-body");
+    if (!all.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="table-loading">No anomalies detected.</td></tr>';
+    } else {
+        tbody.innerHTML = all
+            .map(
+                (a) => `
+                <tr>
+                    <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
+                    <td><span class="anomaly-type-badge anomaly-type-${a.type.replace(/\s/g, "_")}">${a.display_type}</span></td>
+                    <td>${a.description}</td>
+                    <td>${formatCurrencyCompact(a.actual_value)}</td>
+                    <td>${formatCurrencyCompact(a.expected_value)}</td>
+                    <td class="${a.deviation_pct >= 0 ? "deviation-positive" : "deviation-negative"}">${a.deviation_pct >= 0 ? "+" : ""}${a.deviation_pct}%</td>
+                </tr>
+            `
+            )
+            .join("");
+    }
+
+    renderAnomalyChart(anomalies);
+}
+
+function renderAnomalyChart(anomalies) {
+    const canvas = document.getElementById("anomaly-chart");
+    if (!canvas) return;
+
+    const chart = Chart.getChart("anomaly-chart");
+    if (chart) chart.destroy();
+
+    const tsAnomalies = anomalies.time_series || [];
+    const labels = tsAnomalies.map((a) => (a.context && a.context.month ? a.context.month : "—"));
+    const values = tsAnomalies.map((a) => a.actual_value);
+    const expected = tsAnomalies.map((a) => a.expected_value);
+
+    new Chart(canvas, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Actual Revenue",
+                    data: values,
+                    backgroundColor: values.map((v, i) => {
+                        const sev = tsAnomalies[i]?.severity;
+                        return sev === "high" ? "#ef4444" : sev === "medium" ? "#f59e0b" : "rgba(99, 102, 241, 0.6)";
+                    }),
+                    borderRadius: 6,
+                },
+                {
+                    label: "Expected (Average)",
+                    data: expected,
+                    backgroundColor: "rgba(148, 163, 184, 0.2)",
+                    borderRadius: 6,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "top", align: "end" },
+                tooltip: {
+                    ...chartTooltipOptions(),
+                    callbacks: {
+                        label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.raw)}`,
+                    },
+                },
+            },
+            scales: {
+                x: { grid: { color: chartColors.grid } },
+                y: {
+                    grid: { color: chartColors.grid },
+                    ticks: { callback: (value) => formatCurrencyCompact(value) },
+                },
+            },
+        },
+    });
+}
+
+/* ---------- Big Data Analysis ---------- */
+
+function renderBigDataKPIs() {
+    const bd = state.bigData;
+    if (!bd) return;
+
+    document.getElementById("bd-rows").textContent = bd.rows?.toLocaleString("en-IN") ?? "–";
+    document.getElementById("bd-rows-sub").textContent = "records";
+    document.getElementById("bd-memory").textContent = `${bd.memory_mb ?? 0} MB`;
+    document.getElementById("bd-memory-sub").textContent = "in memory";
+    document.getElementById("bd-strategy").textContent = (bd.strategy ?? "unknown").charAt(0).toUpperCase() + (bd.strategy ?? "unknown").slice(1);
+    document.getElementById("bd-strategy-sub").textContent = "recommended";
+    document.getElementById("bd-nulls").textContent = bd.total_nulls ?? 0;
+    document.getElementById("bd-nulls-sub").textContent = "missing values";
+}
+
+async function loadBigData() {
+    try {
+        const bigData = await fetchJson("/api/big-data/analyze");
+        state.bigData = bigData;
+        renderBigDataKPIs();
+        renderBigDataPage();
+    } catch (error) {
+        console.error("Failed to load big data analysis:", error);
+    }
+}
+
+function renderBigDataPage() {
+    const bd = state.bigData;
+    if (!bd) return;
+
+    const strategyEl = document.getElementById("bd-strategy");
+    if (strategyEl) {
+        strategyEl.className = "kpi-value strategy-badge strategy-" + (bd.strategy || "full");
+    }
+
+    const recBody = document.getElementById("bd-recommendations-body");
+    const recommendations = [];
+
+    if (bd.strategy === "sampled") {
+        recommendations.push({ text: `Sample dataset to ${bd.recommended_sample_rows?.toLocaleString("en-IN") ?? "10,000"} rows for visualization.`, type: "info" });
+    }
+    if (bd.strategy === "chunked") {
+        recommendations.push({ text: "Use chunked aggregation for large-scale grouping operations.", type: "info" });
+    }
+    if (bd.total_nulls > 0) {
+        recommendations.push({ text: `${bd.total_nulls} null values detected — handle before downstream analysis.`, type: "warn" });
+    }
+    if (bd.duplicate_rows > 0) {
+        recommendations.push({ text: `${bd.duplicate_rows} duplicate rows found — consider deduplication.`, type: "warn" });
+    }
+    if (bd.memory_mb > 100) {
+        recommendations.push({ text: `High memory usage (${bd.memory_mb} MB) — monitor during processing.`, type: "info" });
+    }
+    if (recommendations.length === 0) {
+        recommendations.push({ text: "Dataset is well-sized for full in-memory processing.", type: "info" });
+    }
+
+    recBody.innerHTML = recommendations
+        .map(
+            (r, i) => `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${r.text}</td>
+                <td><span class="severity-badge severity-${r.type === "warn" ? "high" : "low"}">${r.type}</span></td>
+            </tr>
+        `
+        )
+        .join("");
+
+    renderColumnTypesChart(bd);
+    renderNullsChart(bd);
+    renderColumnProfilesTable(bd);
+}
+
+function renderColumnTypesChart(bd) {
+    const canvas = document.getElementById("bd-column-types-chart");
+    if (!canvas) return;
+
+    const chart = Chart.getChart("bd-column-types-chart");
+    if (chart) chart.destroy();
+
+    new Chart(canvas, {
+        type: "doughnut",
+        data: {
+            labels: ["Numeric", "DateTime", "Categorical"],
+            datasets: [{
+                data: [bd.numeric_columns ?? 0, bd.datetime_columns ?? 0, bd.categorical_columns ?? 0],
+                backgroundColor: [chartColors.accent, chartColors.success, chartColors.amber],
+                borderColor: "#151c2c",
+                borderWidth: 3,
+                hoverOffset: 8,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "62%",
+            plugins: {
+                legend: { position: "bottom" },
+                tooltip: {
+                    ...chartTooltipOptions(),
+                    callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw} columns` },
+                },
+            },
+        },
+    });
+}
+
+function renderNullsChart(bd) {
+    const canvas = document.getElementById("bd-nulls-chart");
+    if (!canvas) return;
+
+    const chart = Chart.getChart("bd-nulls-chart");
+    if (chart) chart.destroy();
+
+    const profiles = bd.column_profiles || [];
+    const topNulls = profiles.filter((p) => p.null_count > 0).sort((a, b) => b.null_count - a.null_count).slice(0, 8);
+
+    new Chart(canvas, {
+        type: "bar",
+        data: {
+            labels: topNulls.map((p) => p.name),
+            datasets: [{
+                label: "Null Count",
+                data: topNulls.map((p) => p.null_count),
+                backgroundColor: "rgba(239, 68, 68, 0.6)",
+                borderRadius: 6,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...chartTooltipOptions(),
+                    callbacks: { label: (ctx) => ` ${ctx.raw} null values` },
+                },
+            },
+            scales: {
+                x: { grid: { color: chartColors.grid } },
+                y: { grid: { color: chartColors.grid }, beginAtZero: true, ticks: { stepSize: 1 } },
+            },
+        },
+    });
+}
+
+function renderColumnProfilesTable(bd) {
+    const tbody = document.getElementById("bd-columns-body");
+    const profiles = bd.column_profiles || [];
+
+    if (!profiles.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="table-loading">No column profiles available.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = profiles
+        .map(
+            (p) => `
+            <tr>
+                <td><strong>${p.name}</strong></td>
+                <td>${p.dtype}</td>
+                <td>${p.null_count}</td>
+                <td>${p.unique_count}</td>
+                <td>${(p.unique_ratio * 100).toFixed(1)}%</td>
+                <td>${p.is_high_cardinality ? "Yes" : "No"}</td>
+            </tr>
+        `
+        )
+        .join("");
 }
 
 /* ---------- Event Listeners ---------- */

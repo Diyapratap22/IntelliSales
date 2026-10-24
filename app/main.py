@@ -26,6 +26,8 @@ from src.analytics import (
     get_revenue_trend,
     summarize_performance_by,
 )
+from src.anomaly_detection import run_full_anomaly_analysis, get_anomaly_summary
+from src.big_data_analysis import big_data_summary
 from src.data_loader import load_sales_data
 from src.forecasting import get_forecast_series
 from src.utils import dataframe_to_records
@@ -200,6 +202,45 @@ def insights() -> list[dict]:
     """Verified rule-based insights derived from the dataset."""
 
     return generate_verified_insights(get_dataset())
+
+
+@app.get("/api/anomalies")
+def anomalies(threshold: float = 2.5) -> dict:
+    """Anomaly detection results for the current dataset.
+
+    Parameters
+    ----------
+    threshold : float
+        Z-score threshold for flagging anomalies (default 2.5).
+    """
+
+    if threshold <= 0:
+        raise HTTPException(status_code=400, detail="Threshold must be greater than zero.")
+
+    try:
+        return run_full_anomaly_analysis(get_dataset(), threshold=threshold)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/anomalies/summary")
+def anomaly_summary() -> dict:
+    """Lightweight anomaly summary for dashboard KPI cards."""
+
+    try:
+        return get_anomaly_summary(get_dataset())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/big-data/analyze")
+def big_data_analyze() -> dict:
+    """Big data analysis and processing-strategy recommendation."""
+
+    try:
+        return big_data_summary(get_dataset())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.post("/api/analyst/ask")

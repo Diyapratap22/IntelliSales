@@ -2,7 +2,7 @@
 
 **AI Data Analyst for Sales Intelligence & Forecasting**
 
-IntelliSales is an end-to-end sales analytics and forecasting system. Users upload a CSV or Excel sales file; the application validates it against a strict data contract, derives the `revenue` and `profit` metrics, computes revenue and profit analytics, visualizes monthly trends and performance across products, regions, and categories, generates rule-based insights, forecasts future revenue with confidence intervals, and answers plain-language questions through an AI Analyst.
+IntelliSales is an end-to-end sales analytics and forecasting system. Users upload a CSV or Excel sales file; the application validates it against a strict data contract, derives the `revenue` and `profit` metrics, computes revenue and profit analytics, visualizes monthly trends and performance across products, regions, and categories, generates rule-based insights, forecasts future revenue with confidence intervals, detects statistical anomalies, performs big data analysis, and answers plain-language questions through an AI Analyst.
 
 The AI Analyst answers using verified, tool-based calculations that are computed deterministically from the uploaded dataset. It never invents business numbers.
 
@@ -13,7 +13,9 @@ The AI Analyst answers using verified, tool-based calculations that are computed
 3. Calculate revenue, profit, and performance analytics
 4. Visualize trends and product/region/category performance
 5. Forecast future revenue with confidence intervals
-6. Ask plain-language questions through the AI Analyst
+6. Detect statistical anomalies in transactions, time-series, and dimensions
+7. Analyze dataset characteristics for big data processing strategy
+8. Ask plain-language questions through the AI Analyst
 
 ---
 
@@ -26,6 +28,8 @@ The AI Analyst answers using verified, tool-based calculations that are computed
 - **Monthly revenue trends** - Aggregated monthly revenue for monitoring growth over time.
 - **Rule-based verified insights** - Auto-generated findings (top product/region/category, key revenue driver, revenue trend, fastest-growing product, peak month, profitability) derived directly from the dataset.
 - **Forecasting with confidence intervals** - Linear-trend monthly revenue forecast with upper and lower confidence bands.
+- **Anomaly detection** - Statistical outlier detection using Z-score and IQR methods across transactions, monthly revenue time-series, and dimension-level performance (product / region / category). Severity-classified findings with descriptions and deviation percentages.
+- **Big data analysis** - Dataset characterization (size, memory, cardinality, nulls, duplicates), processing-strategy recommendations (full / chunked / sampled), stratified sampling for visualization, chunked aggregation for large datasets, and column profile reporting.
 - **AI Analyst with tool-based verified analytics** - Natural-language questions are mapped to deterministic analytics tools; unsupported and unavailable metrics are acknowledged honestly, never guessed.
 - **Interactive dashboard** - Dark, enterprise-style web dashboard built with HTML, CSS, JavaScript, and Chart.js.
 - **Automated data profiling module** - `ydata-profiling`-based exploratory reports can be generated via `src/data_profiler.py`.
@@ -39,8 +43,8 @@ The AI Analyst answers using verified, tool-based calculations that are computed
 +--------------------------------------------------+
 |  Frontend (app/static/)                          |
 |  HTML + CSS + JavaScript + Chart.js              |
-|  Overview, Analytics, Forecasting, AI Analyst    |
-|  pages                                           |
+|  Overview, Analytics, Forecasting, Anomaly       |
+|  Detection, Big Data, AI Analyst pages           |
 +----------------------+---------------------------+
                        |
                        |  REST API (JSON)
@@ -170,6 +174,9 @@ python -m app.streamlit_runner
 | `GET` | `/api/performance/category` | Category performance summary (ranked by revenue) |
 | `GET` | `/api/forecast?periods=6` | Historical + forecast revenue series with confidence bands |
 | `GET` | `/api/insights` | Verified rule-based insights |
+| `GET` | `/api/anomalies` | Anomaly detection results (transactions, time-series, dimensions) with configurable Z-score threshold |
+| `GET` | `/api/anomalies/summary` | Lightweight anomaly summary for dashboard KPI cards |
+| `GET` | `/api/big-data/analyze` | Dataset characterization, processing strategy, and column profiles |
 | `POST` | `/api/analyst/ask` | AI Analyst - answer a question using verified analytics tools |
 
 Notes:
@@ -302,6 +309,8 @@ IntelliSales/
 |   |-- __init__.py
 |   |-- agent.py                   # AI Analyst (tool-based, verified answers)
 |   |-- analytics.py               # KPIs, performance, trends, insights
+|   |-- anomaly_detection.py       # Statistical outlier detection (Z-score, IQR)
+|   |-- big_data_analysis.py       # Dataset characterization, sampling, chunked aggregation
 |   |-- data_loader.py             # Data loading and validation
 |   |-- data_profiler.py           # Automated profiling (library module)
 |   |-- forecasting.py             # Monthly revenue forecasting
@@ -313,7 +322,7 @@ IntelliSales/
 |   `-- data-contract.md           # Data schema documentation
 |-- notebooks/
 |   `-- 01_exploratory_analysis.ipynb  # Empty placeholder (no content yet)
-|-- tests/                         # Pytest suite (21 tests)
+|-- tests/                         # Pytest suite (20 tests)
 |   |-- test_agent.py
 |   |-- test_analytics.py
 |   |-- test_api.py
@@ -344,7 +353,9 @@ IntelliSales/
 - The exploratory notebook `notebooks/01_exploratory_analysis.ipynb` is currently an empty placeholder.
 - The `data/processed/` directory is an empty placeholder; the application does not write processed artifacts today.
 - CORS is configured to allow all origins and the service has no authentication; it is intended for local, single-user/demo use.
-- The legacy Streamlit dashboard supports uploads and basic overview analytics but does not expose forecasting, insights, or the AI Analyst.
+- The legacy Streamlit dashboard supports uploads and basic overview analytics but does not expose forecasting, insights, anomaly detection, big data analysis, or the AI Analyst.
+- Anomaly detection uses a Z-score threshold (default 2.5). Lower thresholds surface more anomalies; higher thresholds surface only extreme outliers.
+- Big data analysis recommends `full` processing for datasets under 50,000 rows and 100 MB, `chunked` for larger memory-footprint datasets, and `sampled` for very large datasets (downsampled to 10,000 rows for visualization).
 
 ---
 

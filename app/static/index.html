@@ -44,6 +44,14 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg>
                     <span>AI Analyst</span>
                 </button>
+                <button class="nav-item" data-page="anomalies">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M12 16h.01"/></svg>
+                    <span>Anomaly Detection</span>
+                </button>
+                <button class="nav-item" data-page="bigdata">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                    <span>Big Data</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -304,6 +312,167 @@
                                 <tr><td colspan="4" class="table-loading">Loading…</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== Anomaly Detection Page ===== -->
+            <section class="page" id="page-anomalies">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Anomaly Detection</h3>
+                        <span class="panel-badge">Statistical outlier analysis</span>
+                    </div>
+                    <div class="kpi-grid anomaly-kpis">
+                        <div class="kpi-card">
+                            <div class="kpi-label">Total Anomalies</div>
+                            <div class="kpi-value" id="anomaly-total">–</div>
+                            <div class="kpi-sub" id="anomaly-total-sub">detected</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">High Severity</div>
+                            <div class="kpi-value" id="anomaly-high">–</div>
+                            <div class="kpi-sub" id="anomaly-high-sub">needs attention</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Transaction Anomalies</div>
+                            <div class="kpi-value" id="anomaly-txn">–</div>
+                            <div class="kpi-sub" id="anomaly-txn-sub">unusual sales</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Time-Series Anomalies</div>
+                            <div class="kpi-value" id="anomaly-ts">–</div>
+                            <div class="kpi-sub" id="anomaly-ts-sub">revenue spikes/drops</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-row">
+                        <div class="panel chart-panel">
+                            <div class="panel-header">
+                                <h3>Revenue Anomalies by Month</h3>
+                                <span class="panel-badge">Z-score threshold</span>
+                            </div>
+                            <div class="chart-container tall">
+                                <canvas id="anomaly-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Anomaly Details</h3>
+                            <span class="panel-badge">Sorted by severity</span>
+                        </div>
+                        <div class="table-container" id="anomaly-table-container">
+                            <table class="data-table" id="anomaly-table">
+                                <thead>
+                                    <tr>
+                                        <th>Severity</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                        <th>Actual</th>
+                                        <th>Expected</th>
+                                        <th>Deviation</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="anomaly-table-body">
+                                    <tr><td colspan="6" class="table-loading">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- ===== Big Data Page ===== -->
+            <section class="page" id="page-bigdata">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Big Data Analysis</h3>
+                        <span class="panel-badge">Dataset health &amp; processing strategy</span>
+                    </div>
+                    <div class="kpi-grid bigdata-kpis">
+                        <div class="kpi-card">
+                            <div class="kpi-label">Total Rows</div>
+                            <div class="kpi-value" id="bd-rows">–</div>
+                            <div class="kpi-sub" id="bd-rows-sub">records</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Memory Usage</div>
+                            <div class="kpi-value" id="bd-memory">–</div>
+                            <div class="kpi-sub" id="bd-memory-sub">in memory</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Processing Strategy</div>
+                            <div class="kpi-value" id="bd-strategy">–</div>
+                            <div class="kpi-sub" id="bd-strategy-sub">recommended</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Null Values</div>
+                            <div class="kpi-value" id="bd-nulls">–</div>
+                            <div class="kpi-sub" id="bd-nulls-sub">missing values</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-row">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h3>Column Types</h3>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="bd-column-types-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h3>Null Values by Column</h3>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="bd-nulls-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Processing Recommendations</h3>
+                        </div>
+                        <div class="table-container" id="bd-recommendations-container">
+                            <table class="data-table" id="bd-recommendations-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Recommendation</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bd-recommendations-body">
+                                    <tr><td colspan="3" class="table-loading">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Column Profiles</h3>
+                        </div>
+                        <div class="table-container" id="bd-columns-container">
+                            <table class="data-table" id="bd-columns-table">
+                                <thead>
+                                    <tr>
+                                        <th>Column</th>
+                                        <th>Type</th>
+                                        <th>Nulls</th>
+                                        <th>Unique</th>
+                                        <th>Unique %</th>
+                                        <th>High Cardinality</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bd-columns-body">
+                                    <tr><td colspan="6" class="table-loading">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
