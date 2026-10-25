@@ -2,67 +2,73 @@
 
 **AI Data Analyst for Sales Intelligence & Forecasting**
 
-IntelliSales is an end-to-end sales analytics and forecasting system. Users upload a CSV or Excel sales file; the application validates it against a strict data contract, derives the `revenue` and `profit` metrics, computes revenue and profit analytics, visualizes monthly trends and performance across products, regions, and categories, generates rule-based insights, forecasts future revenue with confidence intervals, detects statistical anomalies, performs big data analysis, and answers plain-language questions through an AI Analyst.
+IntelliSales is a sales decision-support system that accepts CSV or Excel sales data, validates and profiles it, performs analytics and forecasting, and explains verified results through a natural-language interface and interactive dashboard.
 
-The AI Analyst answers using verified, tool-based calculations that are computed deterministically from the uploaded dataset. It never invents business numbers.
-
-**Main workflow:**
-
-1. Upload sales data (CSV or Excel)
-2. Validate the data against the IntelliSales data contract and derive business metrics
-3. Calculate revenue, profit, and performance analytics
-4. Visualize trends and product/region/category performance
-5. Forecast future revenue with confidence intervals
-6. Detect statistical anomalies in transactions, time-series, and dimensions
-7. Analyze dataset characteristics for big data processing strategy
-8. Ask plain-language questions through the AI Analyst
+The application is built around a core principle: **calculations, analytics, and forecasts come from deterministic Python pipelines — the AI layer interprets questions and explains verified results; it never invents business numbers.**
 
 ---
 
 ## Key Features
 
-- **Sales data upload** - CSV, XLSX, and XLS files can be uploaded through the dashboard or the upload endpoint.
-- **Strict data validation** - Uploads are validated against a fixed contract of required columns, data types, and value rules; invalid files are rejected with a clear error.
-- **Revenue and profit analytics** - Headline KPIs: total revenue, total profit, profit margin, units sold, and transactions.
-- **Product, region, and category performance** - Ranked summaries of revenue, profit, units, and margin per dimension.
-- **Monthly revenue trends** - Aggregated monthly revenue for monitoring growth over time.
-- **Rule-based verified insights** - Auto-generated findings (top product/region/category, key revenue driver, revenue trend, fastest-growing product, peak month, profitability) derived directly from the dataset.
-- **Forecasting with confidence intervals** - Linear-trend monthly revenue forecast with upper and lower confidence bands.
-- **Anomaly detection** - Statistical outlier detection using Z-score and IQR methods across transactions, monthly revenue time-series, and dimension-level performance (product / region / category). Severity-classified findings with descriptions and deviation percentages.
-- **Big data analysis** - Dataset characterization (size, memory, cardinality, nulls, duplicates), processing-strategy recommendations (full / chunked / sampled), stratified sampling for visualization, chunked aggregation for large datasets, and column profile reporting.
-- **AI Analyst with tool-based verified analytics** - Natural-language questions are mapped to deterministic analytics tools; unsupported and unavailable metrics are acknowledged honestly, never guessed.
-- **Interactive dashboard** - Dark, enterprise-style web dashboard built with HTML, CSS, JavaScript, and Chart.js.
-- **Automated data profiling module** - `ydata-profiling`-based exploratory reports can be generated via `src/data_profiler.py`.
-- **Legacy Streamlit dashboard** - The original Streamlit dashboard is preserved and remains runnable independently.
+| Feature | Description |
+|---|---|
+| **Sales data upload** | CSV, XLSX, and XLS files uploaded through the dashboard or the `/api/dataset/upload` endpoint. |
+| **Strict data validation** | Uploads are validated against a fixed data contract (required columns, data types, value rules); invalid files are rejected with a clear HTTP 400 error. |
+| **Missing-value handling** | Null values are permitted in all columns. Numeric nulls are excluded from aggregations and surfaced in null-count reports; missing dates/products/regions are tolerated and reported. |
+| **Revenue & profit analytics** | Headline KPIs: total revenue, total profit, profit margin (%), units sold, and transaction count. |
+| **Performance by dimension** | Ranked summaries of revenue, profit, units, and margin per product, region, and category. |
+| **Monthly revenue trends** | Aggregated monthly revenue for monitoring growth over time. |
+| **Rule-based verified insights** | Auto-generated findings: top product/region/category, key revenue driver, revenue trend direction, fastest-growing product, peak month, and overall profitability — all computed directly from the dataset. |
+| **Forecasting with confidence bands** | Linear-trend (OLS) monthly revenue forecast with approximate 95% confidence bands (prediction ± 1.96 × residual std dev), lower band clamped at zero. Requires at least three months of history. |
+| **Anomaly detection** | Statistical outlier detection using Z-score and IQR methods across transactions, monthly revenue time-series, and dimension-level performance (product / region / category). Severity-classified (high / medium / low / info) with descriptions and deviation percentages. |
+| **Big data analysis** | Dataset characterization (rows, columns, memory, nulls, duplicates, cardinality), per-column profiling, processing-strategy recommendation (full / sampled / chunked), and chunked aggregation for large datasets. |
+| **AI Analyst** | Natural-language questions mapped to nine deterministic analytics tools (sales summary, top product/region/category, most-profitable region, forecast, trend, revenue-change explanation, recommendations, insights). Unsupported metrics (satisfaction, churn, ratings, conversion, market share, etc.) are acknowledged honestly with data-driven recommendations. |
+| **Interactive dashboard** | Dark, enterprise-style web dashboard built with HTML, CSS, JavaScript, and Chart.js. Pages: Overview, Analytics, Forecasting, AI Analyst, Anomaly Detection, Big Data. |
+| **Automated data profiling** | `ydata-profiling`-based exploratory reports available via `src/data_profiler.py` (library module; not yet exposed through the API or dashboard). |
+| **Legacy Streamlit dashboard** | The original Streamlit dashboard is preserved in `app/streamlit_dashboard.py` and remains runnable independently (overview analytics only; no forecasting, insights, anomaly detection, big data analysis, or AI Analyst). |
 
 ---
 
-## Architecture
+## System Architecture & Data Flow
 
-```text
-+--------------------------------------------------+
-|  Frontend (app/static/)                          |
-|  HTML + CSS + JavaScript + Chart.js              |
-|  Overview, Analytics, Forecasting, Anomaly       |
-|  Detection, Big Data, AI Analyst pages           |
-+----------------------+---------------------------+
-                       |
-                       |  REST API (JSON)
-                       v
-+----------------------+---------------------------+
-|  FastAPI backend (app/main.py)                   |
-|  /api/* endpoints, in-memory dataset store,      |
-|  static file serving                             |
-+----------------------+---------------------------+
-                       |
-                       v
-+----------------------+---------------------------+
-|  Analytics / data / forecasting modules (src/)   |
-|  data_loader -> analytics -> forecasting -> agent|
-|  All numbers are computed deterministically      |
-|  from the dataset                                |
-+--------------------------------------------------+
 ```
+┌─────────────────────────────────────────────────────────────────────┐
+│  FRONTEND — app/static/                                             │
+│  HTML5 + CSS3 + Vanilla JavaScript + Chart.js 4.x                   │
+│                                                                     │
+│  Pages:                                                             │
+│  • Overview        — headline KPI cards                             │
+│  • Analytics       — product / region / category performance charts │
+│  • Forecasting     — historical + forecast revenue with bands       │
+│  • AI Analyst      — natural-language Q&A with verified answers     │
+│  • Anomaly Detection — statistical outlier analysis                 │
+│  • Big Data        — dataset health & processing strategy           │
+└──────────────┬──────────────────────────────────────────────────────┘
+               │ HTTP/JSON (GET / POST)
+               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  BACKEND — FastAPI (app/main.py)                                    │
+│  • In-memory dataset store (sample data or user upload)             │
+│  • CORS enabled (all origins); no authentication (local/demo use)   │
+│  • Static file serving for the dashboard frontend                   │
+│  • Swagger UI at /docs                                              │
+└──────────────┬──────────────────────────────────────────────────────┘
+               │ imports
+               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  ANALYTICS LAYER — src/                                             │
+│  • data_loader.py       — CSV/Excel load, validation, derived metrics│
+│  • analytics.py         — KPIs, performance, trends, insights       │
+│  • forecasting.py       — linear-trend forecast + confidence bands  │
+│  • anomaly_detection.py — Z-score & IQR outlier detection           │
+│  • big_data_analysis.py — characterization, strategy, profiling     │
+│  • agent.py             — keyword-based AI Analyst (9 tools)        │
+│  • utils.py             — JSON-safe serialization helpers           │
+│  • data_profiler.py     — ydata-profiling reports (library module)  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Data flow:** A user uploads a sales file -> data_loader.load_sales_data() validates the contract and derives revenue and profit -> the cleaned DataFrame is held in memory by the FastAPI app -> dashboard and API endpoints call the analytics modules -> results are returned as JSON-serialisable records -> Chart.js renders visualisations on the frontend.
 
 The legacy Streamlit dashboard (`app/streamlit_dashboard.py`) is preserved separately and runs standalone, independent of the FastAPI application.
 
@@ -82,24 +88,86 @@ The legacy Streamlit dashboard (`app/streamlit_dashboard.py`) is preserved separ
 
 ---
 
-## Tech Stack
+## Technology Stack
 
-- **Python 3.12** - backend, analytics, forecasting, and tests
-- **FastAPI** - REST API and application server
-- **Uvicorn** - ASGI server used to run the application
-- **Pandas** - data loading, validation, and analytics
-- **NumPy** - linear-regression fitting and serialization helpers
-- **openpyxl** - Excel (XLSX/XLS) file support
-- **python-multipart** - multipart form parsing for file uploads
-- **ydata-profiling** - automated data profiling module
-- **Streamlit** - legacy dashboard (preserved)
-- **JavaScript** - dashboard frontend logic (`app/static/app.js`)
-- **HTML/CSS** - dashboard structure and styling
-- **Chart.js** - charting library used by the frontend (loaded from CDN)
-- **pytest** - automated test suite
-- **Conda** - Python environment management (the `intellisales` environment)
+| Layer | Technology | Version / Notes |
+|---|---|---|
+| Language | Python | 3.12 |
+| Web framework | FastAPI | `app/main:app` |
+| ASGI server | Uvicorn | `--reload` for development |
+| Data manipulation | pandas | DataFrame-based pipeline |
+| Numerical computing | NumPy | `polyfit` for linear-trend forecasting |
+| Excel support | openpyxl | XLSX / XLS reading |
+| Data profiling | ydata-profiling | Library module only |
+| Frontend | HTML5 / CSS3 / JavaScript (ES6) | Vanilla JS, no build step |
+| Charts | Chart.js | 4.4.1 (via CDN) |
+| Legacy dashboard | Streamlit | `app/streamlit_dashboard.py` |
+| Testing | pytest | 21 tests in `tests/` |
+| Environment | Conda / Anaconda | `intellisales` environment |
+| Windows launcher | Batch script | `run_intellisales.bat` |
+
+**Runtime dependencies** (`requirements.txt`):
+
+```
+pandas
+openpyxl
+ydata-profiling
+setuptools<82
+pytest
+streamlit
+numpy
+fastapi
+uvicorn
+python-multipart
+```
 
 ---
+
+## Project Directory Structure
+
+```
+IntelliSales/
+├── app/
+│   ├── main.py                     # FastAPI application + REST API + static serving
+│   ├── streamlit_dashboard.py      # Legacy Streamlit dashboard (overview only)
+│   ├── streamlit_runner.py         # Streamlit module runner
+│   └── static/
+│       ├── index.html              # Dashboard HTML shell (6 pages)
+│       ├── app.js                  # Dashboard frontend logic + Chart.js rendering
+│       └── styles.css              # Dashboard styles (dark enterprise theme)
+├── src/
+│   ├── __init__.py
+│   ├── agent.py                    # AI Analyst — keyword-based intent + 9 tools
+│   ├── analytics.py                # KPIs, performance, trends, verified insights
+│   ├── anomaly_detection.py        # Z-score / IQR outlier detection (tx, ts, dims)
+│   ├── big_data_analysis.py        # Characterization, strategy, column profiles
+│   ├── data_loader.py              # CSV/Excel load, validation, derived metrics
+│   ├── data_profiler.py            # ydata-profiling reports (library module)
+│   ├── forecasting.py              # Linear-trend forecast + confidence bands
+│   └── utils.py                    # JSON-safe serialization helpers
+├── data/
+│   └── raw/
+│       └── sample_sales.csv        # Bundled sample dataset (24 monthly rows)
+├── docs/
+│   └── data-contract.md            # Sales data schema documentation
+├── notebooks/
+│   └── 01_exploratory_analysis.ipynb  # Empty placeholder (no content)
+├── tests/
+│   ├── test_agent.py
+│   ├── test_analytics.py
+│   ├── test_api.py
+│   ├── test_data_loader.py
+│   ├── test_forecasting.py
+│   └── test_profiler.py
+├── .vscode/                        # Editor configuration
+├── .gitignore
+├── LICENSE                         # MIT License
+├── PROJECT_CONTEXT.md              # Project context and development notes
+├── pytest.ini                      # Pytest configuration
+├── requirements.txt                # Python dependencies
+├── README.md                       # This file
+└── run_intellisales.bat            # Windows one-click launcher
+```
 
 ## Quick Start
 
@@ -264,7 +332,7 @@ Supported tools:
 
 ## Dashboard
 
-The web dashboard (`app/static/index.html`) is a single-page application with four pages:
+The web dashboard (`app/static/index.html`) is a single-page application with six pages:
 
 - **Overview** - KPI cards, monthly revenue trend, historical + forecast revenue chart, verified insights and revenue drivers, product performance table, regional bar chart, and category composition chart.
 - **Analytics** - Tabbed performance table for product, region, or category, together with the monthly revenue trend chart.
@@ -272,6 +340,85 @@ The web dashboard (`app/static/index.html`) is a single-page application with fo
 - **AI Analyst** - Chat interface with suggestion chips; a global search bar also forwards questions to the analyst.
 
 Every chart and table is populated from the verified API endpoints; the frontend performs no business calculations itself.
+
+---
+
+## Data Validation & Missing-Value Handling
+
+### Validation rules (enforced at load time in `src/data_loader.py`)
+
+| Rule | Behavior on failure |
+|---|---|
+| Required columns present | File rejected with HTTP 400 listing missing columns |
+| `date` parses as valid timestamp | Invalid values coerced to NaT (excluded from time-based groupings) |
+| `product` and `region` not blank | File rejected |
+| `quantity` is a whole number > 0 | File rejected |
+| `unit_price` and `cost` >= 0 | File rejected |
+
+Null values are **permitted** in all columns. Numeric nulls are excluded from aggregations (sums, averages) but retained in the dataset and surfaced in null-count reports. Missing dates/products/regions are tolerated — they are excluded from time-based or dimension-based groupings where null.
+
+### Column profiling (`src/big_data_analysis.py`)
+
+Each column is profiled with:
+
+- Data type
+- Null count and null percentage
+- Unique count and unique ratio
+- High-cardinality flag (unique ratio > 0.5 with > 100 rows)
+
+### Duplicate detection (`src/big_data_analysis.py`)
+
+Duplicate rows are detected via `pandas.DataFrame.duplicated()` and reported as a count in the big data summary (`duplicate_rows`).
+
+---
+
+## Anomaly Detection (`src/anomaly_detection.py`)
+
+Anomaly detection uses Z-score and IQR methods across three scopes:
+
+| Scope | Method | Default threshold | What is flagged |
+|---|---|---|---|
+| Transactions | Z-score | 2.5 | Individual sales with revenue far from the mean |
+| Monthly time-series | Z-score | 2.0 | Months with total revenue far from the monthly mean |
+| Dimensions (product/region/category) | Z-score | 2.5 | Dimensions whose revenue is far from peer average |
+
+Severity is classified as **high** (≥3.0σ), **medium** (≥2.5σ), **low** (≥2.0σ), or **info**. Each anomaly record includes:
+
+- `actual_value` and `expected_value`
+- `z_score` (for Z-score method)
+- `deviation_pct` (percentage deviation from expected)
+- `description` (human-readable explanation)
+- `context` (date, product, region, category, quantity, unit_price, cost, profit)
+
+**API endpoints:**
+
+- `GET /api/anomalies?threshold=2.5` — full anomaly analysis
+- `GET /api/anomalies/summary` — lightweight summary counts for KPI cards
+
+**Note on threshold:** Transaction anomalies use the configured threshold (default 2.5). Time-series detection uses its own default threshold of 2.0 because monthly aggregates have fewer data points and require a more sensitive threshold.
+
+---
+
+## Big Data Analysis (`src/big_data_analysis.py`)
+
+The Big Data Analysis page characterizes the dataset and recommends a processing strategy:
+
+| Characterization | Description |
+|---|---|
+| Rows / columns | Dataset dimensions |
+| Memory usage | Computed with `memory_usage(deep=True)` |
+| Total nulls | Sum of nulls across all columns |
+| Duplicate rows | Exact duplicate row count |
+| Column profiles | Per-column null count, null %, unique count, unique ratio, high-cardinality flag |
+| Column types | Numeric, datetime, categorical classification |
+
+**Processing strategy:**
+
+| Strategy | Condition | Behavior |
+|---|---|---|
+| `full` | < 50,000 rows and < 100 MB | Process the complete dataset |
+| `chunked` | Larger memory footprint | Aggregate in 10,000-row chunks |
+| `sampled` | Very large datasets | Downsample to 10,000 rows for visualization |
 
 ---
 
@@ -293,51 +440,6 @@ pytest
 | `tests/test_agent.py` | 2 | AI Analyst behaviour for unavailable metrics (gap acknowledgement plus recommendations) and direct recommendation questions |
 | `tests/test_api.py` | 10 | Health check, sample-data KPIs, revenue trend, performance endpoints, forecast, insights, analyst endpoint (verified answer, empty-question rejection), CSV upload flow, and rejected unsupported uploads |
 | `tests/test_profiler.py` | 1 | Automated profiling report generation |
-
----
-
-## Project Structure
-
-```text
-IntelliSales/
-|-- app/
-|   |-- main.py                    # FastAPI application (API + static frontend)
-|   |-- streamlit_dashboard.py     # Preserved legacy Streamlit dashboard
-|   |-- streamlit_runner.py        # Launcher for the legacy Streamlit dashboard
-|   `-- static/                    # Frontend (index.html, styles.css, app.js)
-|-- src/
-|   |-- __init__.py
-|   |-- agent.py                   # AI Analyst (tool-based, verified answers)
-|   |-- analytics.py               # KPIs, performance, trends, insights
-|   |-- anomaly_detection.py       # Statistical outlier detection (Z-score, IQR)
-|   |-- big_data_analysis.py       # Dataset characterization, sampling, chunked aggregation
-|   |-- data_loader.py             # Data loading and validation
-|   |-- data_profiler.py           # Automated profiling (library module)
-|   |-- forecasting.py             # Monthly revenue forecasting
-|   `-- utils.py                   # JSON-safe serialization helpers
-|-- data/
-|   |-- raw/sample_sales.csv       # Bundled sample dataset (loaded by default)
-|   `-- processed/                 # Empty output directory placeholder
-|-- docs/
-|   `-- data-contract.md           # Data schema documentation
-|-- notebooks/
-|   `-- 01_exploratory_analysis.ipynb  # Empty placeholder (no content yet)
-|-- tests/                         # Pytest suite (20 tests)
-|   |-- test_agent.py
-|   |-- test_analytics.py
-|   |-- test_api.py
-|   |-- test_data_loader.py
-|   |-- test_forecasting.py
-|   `-- test_profiler.py
-|-- .vscode/                       # Editor configuration
-|-- requirements.txt               # Python dependencies
-|-- pytest.ini                     # Pytest configuration
-|-- run_intellisales.bat           # Windows one-click launcher
-|-- PROJECT_CONTEXT.md             # Project context and development notes
-|-- LICENSE                        # MIT License
-|-- .gitignore
-`-- README.md
-```
 
 ---
 
