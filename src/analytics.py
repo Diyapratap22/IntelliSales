@@ -76,7 +76,7 @@ def summarize_performance_by(
     summary["profit_margin"] = (
         summary["total_profit"]
         .div(summary["total_revenue"].replace(0, pd.NA))
-        .fillna(0)
+        .fillna(0.0)
         .mul(100)
         .round(2)
     )

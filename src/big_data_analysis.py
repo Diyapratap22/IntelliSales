@@ -61,7 +61,7 @@ def characterize_dataset(dataframe: pd.DataFrame) -> dict[str, Any]:
 
     numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
     datetime_columns = dataframe.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
-    categorical_columns = dataframe.select_dtypes(include=["object", "category"]).columns.tolist()
+    categorical_columns = dataframe.select_dtypes(include=["object", "category", "string"]).columns.tolist()
 
     return {
         "rows": int(len(dataframe)),
@@ -297,6 +297,7 @@ def big_data_summary(dataframe: pd.DataFrame) -> dict[str, Any]:
     return {
         "rows": characterization["rows"],
         "columns": characterization["columns"],
+        "column_names": characterization["column_names"],
         "memory_mb": characterization["memory_mb"],
         "total_nulls": characterization["total_nulls"],
         "duplicate_rows": characterization["duplicate_rows"],
@@ -307,4 +308,5 @@ def big_data_summary(dataframe: pd.DataFrame) -> dict[str, Any]:
         "numeric_columns": len(characterization["numeric_columns"]),
         "datetime_columns": len(characterization["datetime_columns"]),
         "categorical_columns": len(characterization["categorical_columns"]),
+        "column_profiles": characterization["column_profiles"],
     }

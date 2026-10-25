@@ -30,6 +30,25 @@ IQR_MULTIPLIER = 1.5
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _safe_float(value: Any) -> float | None:
+    """Convert a value to float, returning None for NaN/NA so it is JSON-serialisable."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(result):
+        return None
+    return result
+
+
+def _safe_int(value: Any) -> int | None:
+    """Convert a value to int, returning None for NaN/NA so it is JSON-serialisable."""
+    result = _safe_float(value)
+    if result is None:
+        return None
+    return int(result)
+
+
 def _severity_from_zscore(z_score: float) -> str:
     """Classify anomaly severity from the absolute Z-score."""
     abs_z = abs(z_score)
@@ -57,22 +76,25 @@ def _build_anomaly(
     anomaly_type: str,
     severity: str,
     z_score: float | None,
-    actual_value: float,
-    expected_value: float,
+    actual_value: float | None,
+    expected_value: float | None,
     description: str,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a standardized anomaly record."""
+    actual_safe = _safe_float(actual_value)
+    expected_safe = _safe_float(expected_value)
+
     deviation_pct = 0.0
-    if expected_value and expected_value != 0:
-        deviation_pct = round(((actual_value - expected_value) / expected_value) * 100, 2)
+    if expected_safe is not None and expected_safe != 0 and actual_safe is not None:
+        deviation_pct = round(((actual_safe - expected_safe) / expected_safe) * 100, 2)
 
     record: dict[str, Any] = {
         "type": anomaly_type,
         "severity": severity,
         "z_score": round(z_score, 2) if z_score is not None else None,
-        "actual_value": round(actual_value, 2),
-        "expected_value": round(expected_value, 2),
+        "actual_value": actual_safe,
+        "expected_value": expected_safe,
         "deviation_pct": deviation_pct,
         "description": description,
     }
@@ -117,8 +139,13 @@ def detect_transaction_anomalies(
     df = dataframe.copy()
     revenues = df["revenue"].astype(float)
 
-    if len(revenues) < 3:
+    # Rows with NaN revenue cannot be scored and would break context values.
+    valid = revenues.notna()
+    if valid.sum() < 3:
         return []
+    df = df.loc[valid].copy()
+    revenues = revenues[valid].reset_index(drop=True)
+    df = df.reset_index(drop=True)
 
     anomalies: list[dict[str, Any]] = []
 
@@ -134,30 +161,37 @@ def detect_transaction_anomalies(
         for idx, z_score in z_scores.items():
             if abs(z_score) >= threshold:
                 row = df.loc[idx]
+                revenue = float(row["revenue"])
                 severity = _severity_from_zscore(float(z_score))
                 direction = "above" if z_score > 0 else "below"
+                date_val = row["date"]
+                date_str = (
+                    pd.to_datetime(date_val).strftime("%b %d, %Y")
+                    if pd.notna(date_val)
+                    else "Unknown date"
+                )
                 anomalies.append(
                     _build_anomaly(
                         anomaly_type="transaction",
                         severity=severity,
                         z_score=float(z_score),
-                        actual_value=float(row["revenue"]),
+                        actual_value=revenue,
                         expected_value=mean,
                         description=(
                             f"{row['product']} sale in {row['region']} on "
-                            f"{pd.to_datetime(row['date']).strftime('%b %d, %Y')} "
-                            f"generated ₹{row['revenue']:,.0f} revenue — "
+                            f"{date_str} "
+                            f"generated ₹{revenue:,.0f} revenue — "
                             f"{direction} average by {abs(float(z_score)):.1f} std devs."
                         ),
                         context={
-                            "date": str(row["date"]),
-                            "product": row["product"],
-                            "region": row["region"],
-                            "category": row["category"],
-                            "quantity": int(row["quantity"]),
-                            "unit_price": float(row["unit_price"]),
-                            "cost": float(row["cost"]),
-                            "profit": float(row["profit"]),
+                            "date": str(date_val) if pd.notna(date_val) else None,
+                            "product": row["product"] if pd.notna(row["product"]) else None,
+                            "region": row["region"] if pd.notna(row["region"]) else None,
+                            "category": row["category"] if pd.notna(row["category"]) else None,
+                            "quantity": _safe_int(row["quantity"]),
+                            "unit_price": _safe_float(row["unit_price"]),
+                            "cost": _safe_float(row["cost"]),
+                            "profit": _safe_float(row["profit"]),
                         },
                     )
                 )
@@ -184,6 +218,12 @@ def detect_transaction_anomalies(
                     direction = "below"
 
                 severity = _severity_from_iqr(deviation)
+                date_val = row["date"]
+                date_str = (
+                    pd.to_datetime(date_val).strftime("%b %d, %Y")
+                    if pd.notna(date_val)
+                    else "Unknown date"
+                )
                 anomalies.append(
                     _build_anomaly(
                         anomaly_type="transaction",
@@ -193,19 +233,19 @@ def detect_transaction_anomalies(
                         expected_value=(q3 if revenue > upper_bound else q1),
                         description=(
                             f"{row['product']} sale in {row['region']} on "
-                            f"{pd.to_datetime(row['date']).strftime('%b %d, %Y')} "
+                            f"{date_str} "
                             f"generated ₹{revenue:,.0f} revenue — "
                             f"{direction} the IQR boundary by {deviation:.1f}x IQR."
                         ),
                         context={
-                            "date": str(row["date"]),
-                            "product": row["product"],
-                            "region": row["region"],
-                            "category": row["category"],
-                            "quantity": int(row["quantity"]),
-                            "unit_price": float(row["unit_price"]),
-                            "cost": float(row["cost"]),
-                            "profit": float(row["profit"]),
+                            "date": str(date_val) if pd.notna(date_val) else None,
+                            "product": row["product"] if pd.notna(row["product"]) else None,
+                            "region": row["region"] if pd.notna(row["region"]) else None,
+                            "category": row["category"] if pd.notna(row["category"]) else None,
+                            "quantity": _safe_int(row["quantity"]),
+                            "unit_price": _safe_float(row["unit_price"]),
+                            "cost": _safe_float(row["cost"]),
+                            "profit": _safe_float(row["profit"]),
                         },
                     )
                 )
@@ -248,11 +288,15 @@ def detect_time_series_anomalies(
     monthly = (
         dataframe.copy()
         .assign(month=lambda d: pd.to_datetime(d["date"]).dt.to_period("M").dt.to_timestamp())
-        .groupby("month", as_index=False)["revenue"]
-        .sum()
-        .sort_values("month")
-        .reset_index(drop=True)
+        .groupby("month", as_index=False)
+        .agg(
+            revenue=("revenue", "sum"),
+            _has_valid=("revenue", lambda s: s.notna().any()),
+        )
     )
+    # Exclude months where every revenue value was NaN.
+    monthly = monthly[monthly["_has_valid"]].drop(columns=["_has_valid"])
+    monthly = monthly.sort_values("month").reset_index(drop=True)
 
     if len(monthly) < 3:
         return []
@@ -422,6 +466,7 @@ def detect_dimension_anomalies(
             if abs(z_score) >= threshold:
                 severity = _severity_from_zscore(z_score)
                 direction = "above" if z_score > 0 else "below"
+                dim_value = row[group_by]
                 anomalies.append(
                     _build_anomaly(
                         anomaly_type="dimension",
@@ -430,16 +475,16 @@ def detect_dimension_anomalies(
                         actual_value=float(row[metric]),
                         expected_value=mean,
                         description=(
-                            f"{group_by.title()} '{row[group_by]}' {metric.replace('_', ' ')} "
+                            f"{group_by.title()} '{dim_value}' {metric.replace('_', ' ')} "
                             f"is ₹{row[metric]:,.0f} — {direction} the peer average "
                             f"by {abs(z_score):.1f} std devs ({z_score:+.2f}z)."
                         ),
                         context={
-                            group_by: row[group_by],
-                            "total_revenue": float(row["total_revenue"]),
-                            "total_profit": float(row["total_profit"]),
-                            "profit_margin": float(row["profit_margin"]),
-                            "total_records": int(row["total_records"]),
+                            group_by: dim_value if pd.notna(dim_value) else None,
+                            "total_revenue": _safe_float(row["total_revenue"]),
+                            "total_profit": _safe_float(row["total_profit"]),
+                            "profit_margin": _safe_float(row["profit_margin"]),
+                            "total_records": _safe_int(row["total_records"]),
                         },
                     )
                 )
@@ -501,6 +546,7 @@ def _detect_dimension_anomalies_iqr(
                 expected = q1
 
             severity = _severity_from_iqr(deviation)
+            dim_value = row[group_by]
             anomalies.append(
                 _build_anomaly(
                     anomaly_type="dimension",
@@ -509,16 +555,16 @@ def _detect_dimension_anomalies_iqr(
                     actual_value=value,
                     expected_value=expected,
                     description=(
-                        f"{group_by.title()} '{row[group_by]}' {metric.replace('_', ' ')} "
+                        f"{group_by.title()} '{dim_value}' {metric.replace('_', ' ')} "
                         f"is ₹{value:,.0f} — {direction} the peer IQR boundary "
                         f"by {deviation:.1f}x IQR."
                     ),
                     context={
-                        group_by: row[group_by],
-                        "total_revenue": float(row["total_revenue"]),
-                        "total_profit": float(row["total_profit"]),
-                        "profit_margin": float(row["profit_margin"]),
-                        "total_records": int(row["total_records"]),
+                        group_by: dim_value if pd.notna(dim_value) else None,
+                        "total_revenue": _safe_float(row["total_revenue"]),
+                        "total_profit": _safe_float(row["total_profit"]),
+                        "profit_margin": _safe_float(row["profit_margin"]),
+                        "total_records": _safe_int(row["total_records"]),
                     },
                 )
             )
@@ -560,7 +606,9 @@ def run_full_anomaly_analysis(
     """
 
     transactions = detect_transaction_anomalies(dataframe, method="zscore", threshold=threshold)
-    time_series = detect_time_series_anomalies(dataframe, method="zscore", threshold=threshold)
+    # Time series uses its own default threshold (2.0) because monthly aggregates
+    # have fewer data points and need a more sensitive threshold than transactions.
+    time_series = detect_time_series_anomalies(dataframe, method="zscore")
     product_anomalies = detect_dimension_anomalies(dataframe, "product", method="zscore", threshold=threshold)
     region_anomalies = detect_dimension_anomalies(dataframe, "region", method="zscore", threshold=threshold)
     category_anomalies = detect_dimension_anomalies(dataframe, "category", method="zscore", threshold=threshold)

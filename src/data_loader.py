@@ -60,26 +60,18 @@ def load_sales_data(file_source: str | Path | BinaryIO) -> pd.DataFrame:
     for column in numeric_columns:
         dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
 
-    if dataframe["date"].isna().any():
-        raise ValueError("The 'date' column contains invalid or missing dates.")
-
-    if (
-        dataframe[["product", "region"]].isna().any().any()
-        or dataframe["product"].astype("string").str.strip().eq("").any()
-        or dataframe["region"].astype("string").str.strip().eq("").any()
-    ):
-        raise ValueError("The 'product' and 'region' columns must not be blank.")
-
     if "category" in dataframe.columns:
         # Allow null/blank category values so they are surfaced in null counts.
         dataframe["category"] = dataframe["category"].astype("string").str.strip()
         dataframe["category"] = dataframe["category"].replace("", pd.NA)
     else:
+        # Derive category from product; null product yields null category.
         dataframe["category"] = dataframe["product"]
 
-    # Allow null values in numeric columns; they are reported in null counts
-    # and excluded from aggregations. Only reject non-numeric garbage is
-    # already coerced to NaN above, which is now permitted.
+    # Null values are permitted in all columns. Numeric nulls are excluded
+    # from aggregations and surfaced in null-count reports. Non-numeric garbage
+    # in numeric columns has already been coerced to NaN above, which is now
+    # permitted rather than rejected.
     pass
 
     non_null_qty = dataframe["quantity"].dropna()

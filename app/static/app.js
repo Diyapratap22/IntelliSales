@@ -902,6 +902,31 @@ function renderAnomalyChart(anomalies) {
     if (chart) chart.destroy();
 
     const tsAnomalies = anomalies.time_series || [];
+    const chartContainer = canvas.parentElement;
+
+    if (!tsAnomalies.length) {
+        // No time-series anomalies — show a clear empty state instead of a
+        // blank canvas with misleading default Chart.js axes.
+        canvas.style.display = "none";
+        let emptyMsg = chartContainer.querySelector(".chart-empty-state");
+        if (!emptyMsg) {
+            emptyMsg = document.createElement("div");
+            emptyMsg.className = "chart-empty-state";
+            emptyMsg.innerHTML = `
+                <div class="empty-icon">📊</div>
+                <p>No revenue anomalies detected for any month.</p>
+                <p class="empty-sub">Monthly revenue stays within the expected range at the current Z-score threshold.</p>
+            `;
+            chartContainer.appendChild(emptyMsg);
+        }
+        return;
+    }
+
+    // Hide empty state and show canvas when we have data.
+    canvas.style.display = "block";
+    const existingEmpty = chartContainer.querySelector(".chart-empty-state");
+    if (existingEmpty) existingEmpty.remove();
+
     const labels = tsAnomalies.map((a) => (a.context && a.context.month ? a.context.month : "—"));
     const values = tsAnomalies.map((a) => a.actual_value);
     const expected = tsAnomalies.map((a) => a.expected_value);
@@ -1069,6 +1094,11 @@ function renderNullsChart(bd) {
 
     const profiles = bd.column_profiles || [];
     const topNulls = profiles.filter((p) => p.null_count > 0).sort((a, b) => b.null_count - a.null_count).slice(0, 8);
+
+    if (!topNulls.length) {
+        // No null values — leave the canvas empty rather than drawing a chart with no data.
+        return;
+    }
 
     new Chart(canvas, {
         type: "bar",

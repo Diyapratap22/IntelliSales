@@ -107,14 +107,21 @@ def dataset_info() -> dict:
 
     dataframe = get_dataset()
 
+    date_min = dataframe["date"].min()
+    date_max = dataframe["date"].max()
+
+    def _unique_sorted(column: str) -> list[str]:
+        values = dataframe[column].dropna().unique().tolist()
+        return sorted(str(v) for v in values)
+
     return {
         "rows": int(len(dataframe)),
         "columns": list(dataframe.columns),
-        "date_min": dataframe["date"].min().isoformat(),
-        "date_max": dataframe["date"].max().isoformat(),
-        "products": sorted(dataframe["product"].unique().tolist()),
-        "regions": sorted(dataframe["region"].unique().tolist()),
-        "categories": sorted(dataframe["category"].unique().tolist()),
+        "date_min": date_min.isoformat() if pd.notna(date_min) else None,
+        "date_max": date_max.isoformat() if pd.notna(date_max) else None,
+        "products": _unique_sorted("product"),
+        "regions": _unique_sorted("region"),
+        "categories": _unique_sorted("category"),
         "source": "sample" if _dataset is None else "uploaded",
     }
 
